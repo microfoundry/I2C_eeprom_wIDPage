@@ -2,25 +2,27 @@
 //    FILE: I2C_eeprom.cpp
 //  AUTHOR: Rob Tillaart
 // VERSION: 1.8.3
-// PURPOSE: Arduino Library for external I2C EEPROM 24LC256 et al.
+// PURPOSE: Arduino Library for external I2C EEPROM M24256 et al.
 //     URL: https://github.com/RobTillaart/I2C_EEPROM.git
 
 
 #include "I2C_eeprom_wIDPage.h"
 
 #define EN_AUTO_WRITE_PROTECT           1  // IF WP pin is supplied then _autoWriteProtect is enabled by default
+#define ALLOW_IDPAGE_LOCK               0
+#define I_ACK_IDPAGE_CANT_BE_UNLOCKED   0
+#define PER_BYTE_COMPARE                1
 
 //  Not used directly
-#define I2C_PAGESIZE_24LC512          128
-#define I2C_PAGESIZE_24LC256           64
-#define I2C_PAGESIZE_24LC128           64
-#define I2C_PAGESIZE_24LC64            32
-#define I2C_PAGESIZE_24LC32            32
-#define I2C_PAGESIZE_24LC16            16
-#define I2C_PAGESIZE_24LC08            16
-#define I2C_PAGESIZE_24LC04            16
-#define I2C_PAGESIZE_24LC02             8
-#define I2C_PAGESIZE_24LC01             8
+#define I2C_PAGESIZE_M24512           128
+#define I2C_PAGESIZE_M24256            64
+#define I2C_PAGESIZE_M24128            64
+#define I2C_PAGESIZE_M24C64            32
+#define I2C_PAGESIZE_M24C32            32
+#define I2C_PAGESIZE_M24C16            16
+#define I2C_PAGESIZE_M24C08            16
+#define I2C_PAGESIZE_M24C04            16
+#define I2C_PAGESIZE_M24C02             8
 
 
 //  I2C buffer needs max 2 bytes for EEPROM address
@@ -37,7 +39,7 @@
 //  PUBLIC FUNCTIONS
 //
 I2C_eeprom::I2C_eeprom(const uint8_t deviceAddress, TwoWire * wire) :
-            I2C_eeprom(deviceAddress, I2C_PAGESIZE_24LC256, wire)
+            I2C_eeprom(deviceAddress, I2C_PAGESIZE_M24256, wire)
 {
 }
 
@@ -81,6 +83,38 @@ bool I2C_eeprom::isConnected(bool testIDPage)
 uint8_t I2C_eeprom::getAddress(bool IDPage)
 {
   return IDPage ? _idPageDeviceAddress : _deviceAddress;
+}
+
+uint8_t I2C_eeprom::lockIDPage() {
+  if(ALLOW_IDPAGE_LOCK && I_ACK_IDPAGE_CANT_BE_UNLOCKED) {
+    uint16_t memoryAddress = 0x400;
+    const uint8_t data = {0b00000010};
+    int rv = _WriteBlock(memoryAddress, &data, 1, true);
+    return rv;
+  }
+  return 13; // Unlucky dawg...
+}
+
+bool I2C_eeprom::isIDPageLocked() {
+  if (_autoWriteProtect)
+  {
+    digitalWrite(_writeProtectPin, LOW);
+  }
+
+  _wire->beginTransmission(_idPageDeviceAddress);
+  _wire->write(0x01);
+  int rv = _wire->endTransmission();
+  Serial.print("Is Locked Test wire return code: ");
+  Serial.println(rv);
+  _wire->beginTransmission(_idPageDeviceAddress);
+  _wire->endTransmission();
+  
+  if (_autoWriteProtect)
+  {
+    digitalWrite(_writeProtectPin, HIGH);
+  }
+  
+  return rv;
 }
 
 
@@ -203,22 +237,73 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
   uint16_t addr = memoryAddress;
   uint16_t len = length;
   uint16_t rv = 0;
-  while (len > 0)
-  {
-    uint8_t buf[I2C_BUFFERSIZE];
-    uint8_t cnt = I2C_BUFFERSIZE;
+  
+  if (_perByteCompare) {
+    Serial.println("Performing BYTE SIZE updates");
+    uint16_t writeCnt = 0;
 
-    if (cnt > len) cnt = len;
-    rv     += _ReadBlock(addr, buf, cnt, IDPage);
-    if (memcmp(buffer, buf, cnt) != 0)
-    {
-      _pageBlock(addr, buffer, cnt, true, IDPage);
+    // Read the original data block from the EEPROM.
+    uint8_t origBuf[length];
+    _ReadBlock(addr, origBuf, length, IDPage);
+
+    // Temporary buffer to hold changes.
+    uint8_t writeBuf[length];
+    memset(writeBuf, 0, length); // Clear the write buffer.
+    
+    uint16_t diffCount = 0;
+    uint16_t startDiffAddr = 0;
+
+    // Iterate over each byte to find differences.
+    for (uint16_t i = 0; i < len; ++i) {
+      if (buffer[i] != origBuf[i]) {
+        // Start buffering when the first difference is found.
+        if (diffCount == 0) {
+          startDiffAddr = addr + i; // Save the starting address of the difference.
+        }
+        writeBuf[diffCount++] = buffer[i]; // Add differing byte to buffer.
+      } else {
+        // If there was a difference and now it stops, write the buffered changes.
+        if (diffCount > 0) {
+          rv += diffCount;
+          _pageBlock(startDiffAddr, writeBuf, diffCount, IDPage);
+          diffCount = 0; // Reset difference count after writing.
+          writeCnt++;
+        }
+      }
     }
-    addr   += cnt;
-    buffer += cnt;
-    len    -= cnt;
+
+    // Check if there are any remaining differences to write after the loop.
+    if (diffCount > 0) {
+      rv += diffCount;
+      _pageBlock(startDiffAddr, writeBuf, diffCount, IDPage);
+      writeCnt++;
+    }
+    Serial.print("EEPROM Write cycles: ");
+    Serial.println(writeCnt);
+
+    return rv;
+  } 
+  else 
+  {
+    Serial.println("Performing BUFFERSIZE updates");
+    while (len > 0)
+    {
+      uint8_t buf[I2C_BUFFERSIZE];
+      uint8_t cnt = I2C_BUFFERSIZE;
+
+      if (cnt > len) cnt = len;
+      _ReadBlock(addr, buf, cnt);
+      if (memcmp(buffer, buf, cnt) != 0)
+      {
+        rv   += cnt; // update rv to actual number of bytes written due to failed compare
+        _pageBlock(addr, buffer, cnt, true);
+      }
+      addr   += cnt;
+      buffer += cnt;
+      len    -= cnt;
+    }
+    return rv;    
   }
-  return rv;
 }
 
 
@@ -291,18 +376,17 @@ bool I2C_eeprom::updateBlockVerify(const uint16_t memoryAddress, const uint8_t *
 //
 //   tested for
 //   2 byte address
-//   24LC512     64 KB    YES
-//   24LC256     32 KB    YES
-//   24LC128     16 KB    YES
-//   24LC64       8 KB    YES
-//   24LC32       4 KB    YES* - no hardware test, address scheme identical to 24LC64.
+//   M24512      64 KB    YES
+//   M24256      32 KB    YES
+//   M24128      16 KB    YES
+//   M24C64       8 KB    YES
+//   M24C32       4 KB    YES* - no hardware test, address scheme identical to M24C64.
 //
 //   1 byte address (uses part of deviceAddress byte)
-//   24LC16       2 KB    YES
-//   24LC08       1 KB    YES
-//   24LC04      512 B    YES
-//   24LC02      256 B    YES
-//   24LC01      128 B    YES
+//   M24C16       2 KB    YES
+//   M24C08       1 KB    YES
+//   M24C04      512 B    YES
+//   M24C02      256 B    YES
 uint32_t I2C_eeprom::determineSize(const bool debug)
 {
   // try to read a byte to see if connected
@@ -545,6 +629,10 @@ bool I2C_eeprom::getAutoWriteProtect()
 }
 
 
+void I2C_eeprom::setPerByteCompare(bool b){
+  _perByteCompare = b;
+}  
+
 ////////////////////////////////////////////////////////////////////
 //
 //  PRIVATE
@@ -559,7 +647,7 @@ int I2C_eeprom::_pageBlock(const uint16_t memoryAddress, const uint8_t * buffer,
   uint16_t len = length;
 
   // Check if IDPage is true and length from the specified address is larger than the single ID page boundary
-  if (IDPage && (addr + len > this->_pageSize))) {
+  if (IDPage && (addr + len > this->_pageSize)) {
     return 11; // Trying to crank it up to 11, and it will wrap when crossing page boundary
   }
 

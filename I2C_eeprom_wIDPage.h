@@ -56,7 +56,7 @@ class I2C_eeprom
 {
 public:
   /**
-    * Initializes the EEPROM with a default deviceSize of I2C_DEVICESIZE_24LC256  (32K EEPROM)
+    * Initializes the EEPROM with a default deviceSize of I2C_DEVICESIZE_M24256  (32K EEPROM)
     */
   I2C_eeprom(const uint8_t deviceAddress, TwoWire *wire = &Wire);
 
@@ -101,10 +101,11 @@ public:
   int      updateByte(const uint16_t memoryAddress, const uint8_t value, bool IDPage = false);
   //  updates a block in memory, writes only if there is a new value.
   //  only to be used when you expect to write same buffer multiple times.
-  //  test your performance gains!
-  //  returns bytes written.
+  //  If _perByteCompare is TRUE (default), returns bytes written.
+  //  Otherwise if length < BUFFERLENGTH, will return length as all will be written
+  //  Else if length > BUFFERLENGTH, will return a total of each chunk of BUFFERLENGTH than changed and potential remainder
   uint16_t updateBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, bool IDPage = false);
-
+  void     setPerByteCompare(bool b);
 
   //  same functions as above but with verify
   //  return false if write or verify failed.
@@ -146,6 +147,11 @@ public:
   bool     getAutoWriteProtect();
 
 
+  // ID Page specific
+  // Should be obvious the this will only work if it's an STMicroelectronics "-D" device WITH Identification Page feature.
+  uint8_t lockIDPage();
+  bool    isIDPageLocked();
+
 private:
   uint8_t  _deviceAddress;
   uint8_t  _idPageDeviceAddress = 0;
@@ -180,6 +186,7 @@ private:
 
   int8_t   _writeProtectPin = -1;
   bool     _autoWriteProtect = false;
+  bool     _perByteCompare = true;
   bool     _hasIDPage = false;
 
   UNIT_TEST_FRIEND;
