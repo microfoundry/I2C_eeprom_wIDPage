@@ -265,7 +265,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
         // If there was a difference and now it stops, write the buffered changes.
         if (diffCount > 0) {
           rv += diffCount;
-          _pageBlock(startDiffAddr, writeBuf, diffCount, IDPage);
+          _pageBlock(startDiffAddr, writeBuf, diffCount, true, IDPage);
           diffCount = 0; // Reset difference count after writing.
           writeCnt++;
         }
@@ -275,7 +275,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
     // Check if there are any remaining differences to write after the loop.
     if (diffCount > 0) {
       rv += diffCount;
-      _pageBlock(startDiffAddr, writeBuf, diffCount, IDPage);
+      _pageBlock(startDiffAddr, writeBuf, diffCount, true, IDPage);
       writeCnt++;
     }
     Serial.print("EEPROM Write cycles: ");
@@ -296,7 +296,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
       if (memcmp(buffer, buf, cnt) != 0)
       {
         rv   += cnt; // update rv to actual number of bytes written due to failed compare
-        _pageBlock(addr, buffer, cnt, true);
+        _pageBlock(addr, buffer, cnt, true, IDPage);
       }
       addr   += cnt;
       buffer += cnt;
@@ -629,7 +629,8 @@ bool I2C_eeprom::getAutoWriteProtect()
 }
 
 
-void I2C_eeprom::setPerByteCompare(bool b){
+void I2C_eeprom::setPerByteCompare(bool b)
+{
   _perByteCompare = b;
 }  
 
