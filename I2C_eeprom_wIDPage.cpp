@@ -48,7 +48,9 @@ I2C_eeprom::I2C_eeprom(const uint8_t deviceAddress, const uint32_t deviceSize, b
 {
   _deviceAddress = deviceAddress;
   _hasIDPage = hasIDPage;
-  if(hasIDPage) _idPageDeviceAddress =_deviceAddress+8;
+  if(hasIDPage) {
+    _idPageDeviceAddress = _deviceAddress + 8;
+  }
   _deviceSize = setDeviceSize(deviceSize);
   _pageSize = getPageSize(_deviceSize);
   _wire = wire;
@@ -632,7 +634,14 @@ bool I2C_eeprom::getAutoWriteProtect()
 void I2C_eeprom::setPerByteCompare(bool b)
 {
   _perByteCompare = b;
-}  
+}
+
+
+bool I2C_eeprom::getPerByteCompare()
+{
+  return _perByteCompare;
+}
+  
 
 ////////////////////////////////////////////////////////////////////
 //
@@ -701,11 +710,18 @@ void I2C_eeprom::_beginTransmission(const uint16_t memoryAddress, bool IDPage)
 //  returns 0 = OK otherwise error
 int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage)
 {
-  _waitEEReady();
+  _waitEEReady(IDPage);
   if (_autoWriteProtect)
   {
     digitalWrite(_writeProtectPin, LOW);
   }
+
+  for(size_t i = 0; i < length; i++) {
+    Serial.print((char)buffer[i]); // Cast each byte to char and print
+  }
+  Serial.println(); // Print a newline at the end
+  Serial.print("Length: ");
+  Serial.println(length, DEC);
 
   this->_beginTransmission(memoryAddress, IDPage);
   _wire->write(buffer, length);
@@ -739,7 +755,7 @@ int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer
 //  returns bytes read
 uint8_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage)
 {
-  _waitEEReady();
+  _waitEEReady(IDPage);
 
   this->_beginTransmission(memoryAddress, IDPage);
   int rv = _wire->endTransmission(false);
@@ -780,7 +796,7 @@ uint8_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, c
 //  returns true if equal.
 bool I2C_eeprom::_verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage)
 {
-  _waitEEReady();
+  _waitEEReady(IDPage);
 
   this->_beginTransmission(memoryAddress, IDPage);
   int rv = _wire->endTransmission();
@@ -820,7 +836,7 @@ bool I2C_eeprom::_verifyBlock(const uint16_t memoryAddress, const uint8_t * buff
 }
 
 
-void I2C_eeprom::_waitEEReady()
+void I2C_eeprom::_waitEEReady(bool IDPage)
 {
   //  Wait until EEPROM gives ACK again.
   //  this is a bit faster than the hardcoded 5 milliSeconds
@@ -828,7 +844,7 @@ void I2C_eeprom::_waitEEReady()
   uint32_t waitTime = I2C_WRITEDELAY + _extraTWR * 1000UL;
   while ((micros() - _lastWrite) <= waitTime)
   {
-    if (isConnected()) return;
+    if (isConnected(IDPage)) return;
     //  TODO remove pre 1.7.4 code
     // _wire->beginTransmission(_deviceAddress);
     // int x = _wire->endTransmission();

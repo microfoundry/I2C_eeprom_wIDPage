@@ -106,6 +106,7 @@ public:
   //  Else if length > BUFFERLENGTH, will return a total of each chunk of BUFFERLENGTH than changed and potential remainder
   uint16_t updateBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, bool IDPage = false);
   void     setPerByteCompare(bool b);
+  bool     getPerByteCompare();
 
   //  same functions as above but with verify
   //  return false if write or verify failed.
@@ -178,7 +179,7 @@ private:
   bool     _verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage = false);
 
   //  to optimize the write latency of the EEPROM
-  void     _waitEEReady();
+  void     _waitEEReady(bool IDPage = false);
 
   TwoWire * _wire;
 
