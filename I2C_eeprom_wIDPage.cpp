@@ -8,10 +8,7 @@
 
 #include "I2C_eeprom_wIDPage.h"
 
-#define EN_AUTO_WRITE_PROTECT           1  // IF WP pin is supplied then _autoWriteProtect is enabled by default
-#define ALLOW_IDPAGE_LOCK               0
-#define I_ACK_IDPAGE_CANT_BE_UNLOCKED   0
-#define PER_BYTE_COMPARE                1
+
 
 //  Not used directly
 #define I2C_PAGESIZE_M24512           128
@@ -67,7 +64,6 @@ bool I2C_eeprom::begin(int8_t writeProtectPin)
   _writeProtectPin = writeProtectPin;
   if (_writeProtectPin >= 0)
   {
-    _autoWriteProtect = EN_AUTO_WRITE_PROTECT;
     pinMode(_writeProtectPin, OUTPUT);
     preventWrite();
   }
@@ -77,14 +73,14 @@ bool I2C_eeprom::begin(int8_t writeProtectPin)
 
 bool I2C_eeprom::isConnected(bool testIDPage)
 {
-  _wire->beginTransmission(testIDPage ? _idPageDeviceAddress : _deviceAddress);
+  _wire->beginTransmission((testIDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress);
   return (_wire->endTransmission() == 0);
 }
 
 
 uint8_t I2C_eeprom::getAddress(bool IDPage)
 {
-  return IDPage ? _idPageDeviceAddress : _deviceAddress;
+  return (IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress;
 }
 
 uint8_t I2C_eeprom::lockIDPage() {
@@ -246,7 +242,15 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
 
     // Read the original data block from the EEPROM.
     uint8_t origBuf[length];
-    _ReadBlock(addr, origBuf, length, IDPage);
+    readBlock(addr, origBuf, length, IDPage);
+    
+    // Serial.println("Beginning of Read Data");
+    // Serial.println();
+    // for (int i = 0; i < length; i++) {
+      // Serial.print((char)origBuf[i]);
+    // }
+    // Serial.println();
+    // Serial.println("END of Read Data");
 
     // Temporary buffer to hold changes.
     uint8_t writeBuf[length];
@@ -280,8 +284,8 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
       _pageBlock(startDiffAddr, writeBuf, diffCount, true, IDPage);
       writeCnt++;
     }
-    Serial.print("EEPROM Write cycles: ");
-    Serial.println(writeCnt);
+    // Serial.print("EEPROM Write cycles: ");
+    // Serial.println(writeCnt);
 
     return rv;
   } 
@@ -690,13 +694,13 @@ void I2C_eeprom::_beginTransmission(const uint16_t memoryAddress, bool IDPage)
 {
   if (this->_isAddressSizeTwoWords)
   {
-    _wire->beginTransmission(IDPage ? _idPageDeviceAddress : _deviceAddress);
+    _wire->beginTransmission((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress);
     //  Address High Byte
     _wire->write((memoryAddress >> 8));
   }
   else
   {
-    uint8_t addr = (IDPage ? _idPageDeviceAddress : _deviceAddress) | ((memoryAddress >> 8) & 0x07);
+    uint8_t addr = ((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress) | ((memoryAddress >> 8) & 0x07);
     _wire->beginTransmission(addr);
   }
 
@@ -716,12 +720,12 @@ int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer
     digitalWrite(_writeProtectPin, LOW);
   }
 
-  for(size_t i = 0; i < length; i++) {
-    Serial.print((char)buffer[i]); // Cast each byte to char and print
-  }
-  Serial.println(); // Print a newline at the end
-  Serial.print("Length: ");
-  Serial.println(length, DEC);
+  // for(size_t i = 0; i < length; i++) {
+    // Serial.print((char)buffer[i]); // Cast each byte to char and print
+  // }
+  // Serial.println(); // Print a newline at the end
+  // Serial.print("Length: ");
+  // Serial.println(length, DEC);
 
   this->_beginTransmission(memoryAddress, IDPage);
   _wire->write(buffer, length);
@@ -775,11 +779,11 @@ uint8_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, c
   uint8_t readBytes = 0;
   if (this->_isAddressSizeTwoWords)
   {
-    readBytes = _wire->requestFrom((IDPage ? _idPageDeviceAddress : _deviceAddress), length);
+    readBytes = _wire->requestFrom(((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress), length);
   }
   else
   {
-    uint8_t addr = (IDPage ? _idPageDeviceAddress : _deviceAddress) | ((memoryAddress >> 8) & 0x07);
+    uint8_t addr = ((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress) | ((memoryAddress >> 8) & 0x07);
     readBytes = _wire->requestFrom(addr, length);
   }
   yield();     //  For OS scheduling
@@ -816,11 +820,11 @@ bool I2C_eeprom::_verifyBlock(const uint16_t memoryAddress, const uint8_t * buff
   uint8_t readBytes = 0;
   if (this->_isAddressSizeTwoWords)
   {
-    readBytes = _wire->requestFrom((IDPage ? _idPageDeviceAddress : _deviceAddress), length);
+    readBytes = _wire->requestFrom(((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress), length);
   }
   else
   {
-    uint8_t addr = (IDPage ? _idPageDeviceAddress : _deviceAddress) | ((memoryAddress >> 8) & 0x07);
+    uint8_t addr = ((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress) | ((memoryAddress >> 8) & 0x07);
     readBytes = _wire->requestFrom(addr, length);
   }
   yield();     //  For OS scheduling

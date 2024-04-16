@@ -10,6 +10,12 @@
 #include "Arduino.h"
 #include "Wire.h"
 
+#define EN_AUTO_WRITE_PROTECT           1  // IF WP pin is supplied then _autoWriteProtect is enabled by default
+#define HAS_ID_PAGE                     1
+#define ALLOW_IDPAGE_LOCK               0
+#define I_ACK_IDPAGE_CANT_BE_UNLOCKED   0
+#define PER_BYTE_COMPARE                1
+
 
 #define I2C_EEPROM_VERSION          (F("1.8.3"))
 
@@ -186,9 +192,9 @@ private:
   bool     _debug = false;
 
   int8_t   _writeProtectPin = -1;
-  bool     _autoWriteProtect = false;
-  bool     _perByteCompare = true;
-  bool     _hasIDPage = false;
+  bool     _autoWriteProtect = EN_AUTO_WRITE_PROTECT;
+  bool     _perByteCompare = PER_BYTE_COMPARE;
+  bool     _hasIDPage = HAS_ID_PAGE;
 
   UNIT_TEST_FRIEND;
 };
