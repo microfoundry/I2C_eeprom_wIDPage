@@ -25,7 +25,7 @@
 //  I2C buffer needs max 2 bytes for EEPROM address
 //  1 byte for EEPROM register address is available in transmit buffer
 #if defined(ESP32) || defined(ESP8266) || defined(PICO_RP2040)
-#define I2C_BUFFERSIZE           128
+#define I2C_BUFFERSIZE           252
 #else
 #define I2C_BUFFERSIZE           30   //  AVR, STM
 #endif
@@ -133,7 +133,7 @@ int I2C_eeprom::writeByte(const uint16_t memoryAddress, const uint8_t data, bool
 int I2C_eeprom::setBlock(const uint16_t memoryAddress, const uint8_t data, const uint16_t length, bool IDPage)
 {
   uint8_t buffer[I2C_BUFFERSIZE];
-  for (uint8_t i = 0; i < I2C_BUFFERSIZE; i++)
+  for (uint16_t i = 0; i < I2C_BUFFERSIZE; i++)
   {
     buffer[i] = data;
   }
@@ -184,13 +184,14 @@ uint16_t I2C_eeprom::readBlock(const uint16_t memoryAddress, uint8_t * buffer, c
   uint16_t rv = 0;
   while (len > 0)
   {
-    uint8_t cnt = I2C_BUFFERSIZE;
+    uint16_t cnt = I2C_BUFFERSIZE;
     if (cnt > len) cnt = len;
     rv     += _ReadBlock(addr, buffer, cnt, IDPage);
     addr   += cnt;
     buffer += cnt;
     len    -= cnt;
   }
+  int et = _wire->endTransmission();
   return rv;
 }
 
@@ -202,7 +203,7 @@ bool I2C_eeprom::verifyBlock(const uint16_t memoryAddress, const uint8_t * buffe
   uint16_t len = length;
   while (len > 0)
   {
-    uint8_t cnt = I2C_BUFFERSIZE;
+    uint16_t cnt = I2C_BUFFERSIZE;
     if (cnt > len) cnt = len;
     if (_verifyBlock(addr, buffer, cnt, IDPage) == false)
     {
@@ -295,7 +296,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
     while (len > 0)
     {
       uint8_t buf[I2C_BUFFERSIZE];
-      uint8_t cnt = I2C_BUFFERSIZE;
+      uint16_t cnt = I2C_BUFFERSIZE;
 
       if (cnt > len) cnt = len;
       _ReadBlock(addr, buf, cnt);
@@ -674,7 +675,7 @@ int I2C_eeprom::_pageBlock(const uint16_t memoryAddress, const uint8_t * buffer,
   {
     uint8_t bytesUntilPageBoundary = this->_pageSize - addr % this->_pageSize;
 
-    uint8_t cnt = I2C_BUFFERSIZE;
+    uint16_t cnt = I2C_BUFFERSIZE;
     if (cnt > len) cnt = len;
     if (cnt > bytesUntilPageBoundary) cnt = bytesUntilPageBoundary;
 
@@ -757,7 +758,7 @@ int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer
 
 //  pre: buffer is large enough to hold length bytes
 //  returns bytes read
-uint8_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage)
+uint16_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage)
 {
   _waitEEReady(IDPage);
 
@@ -776,7 +777,7 @@ uint8_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, c
   }
 
   //  readBytes will always be equal or smaller to length
-  uint8_t readBytes = 0;
+  uint16_t readBytes = 0;
   if (this->_isAddressSizeTwoWords)
   {
     readBytes = _wire->requestFrom(((IDPage && _hasIDPage) ? _idPageDeviceAddress : _deviceAddress), length);
@@ -787,7 +788,7 @@ uint8_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, c
     readBytes = _wire->requestFrom(addr, length);
   }
   yield();     //  For OS scheduling
-  uint8_t cnt = 0;
+  uint16_t cnt = 0;
   while (cnt < readBytes)
   {
     buffer[cnt++] = _wire->read();

@@ -180,7 +180,7 @@ private:
   //  returns I2C status, 0 = OK
   int      _WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage = false);
   //  returns bytes read.
-  uint8_t  _ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage = false);
+  uint16_t  _ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage = false);
   //  compare bytes in EEPROM.
   bool     _verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage = false);
 
