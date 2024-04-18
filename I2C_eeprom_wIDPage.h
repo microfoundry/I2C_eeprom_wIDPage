@@ -76,7 +76,7 @@ public:
     * @param hasIDPage     ST "D" series devices with additional localable ID page
     * @param wire          Select alternative Wire interface
     */
-  I2C_eeprom(const uint8_t deviceAddress, const uint32_t deviceSize, bool hasIDPage, TwoWire *wire = &Wire);
+  I2C_eeprom(const uint8_t deviceAddress, const uint32_t deviceSize, bool hasIDPage=false, TwoWire *wire = &Wire);
 
   //  use default I2C pins.
   bool     begin(int8_t writeProtectPin = -1);
