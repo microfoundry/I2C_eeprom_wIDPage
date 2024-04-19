@@ -36,7 +36,7 @@
 //  PUBLIC FUNCTIONS
 //
 I2C_eeprom::I2C_eeprom(const uint8_t deviceAddress, TwoWire * wire) :
-            I2C_eeprom(deviceAddress, I2C_PAGESIZE_M24256, wire)
+            I2C_eeprom(deviceAddress, I2C_PAGESIZE_M24256, false, wire)
 {
 }
 
@@ -244,19 +244,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
     // Read the original data block from the EEPROM.
     uint8_t origBuf[length];
     readBlock(addr, origBuf, length, IDPage);
-    
-    // Serial.println("Beginning of Read Data");
-    // Serial.println();
-    // for (int i = 0; i < length; i++) {
-      // Serial.print((char)origBuf[i]);
-    // }
-    // Serial.println();
-    // Serial.println("END of Read Data");
 
-    // Temporary buffer to hold changes.
-    uint8_t writeBuf[length];
-    memset(writeBuf, 0, length); // Clear the write buffer.
-    
     uint16_t diffCount = 0;
     uint16_t startDiffAddr = 0;
 
@@ -267,23 +255,16 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
         if (diffCount == 0) {
           startDiffAddr = addr + i; // Save the starting address of the difference.
         }
-        writeBuf[diffCount++] = buffer[i]; // Add differing byte to buffer.
-      } else {
-        // If there was a difference and now it stops, write the buffered changes.
-        if (diffCount > 0) {
-          rv += diffCount;
-          _pageBlock(startDiffAddr, writeBuf, diffCount, true, IDPage);
-          diffCount = 0; // Reset difference count after writing.
-          writeCnt++;
-        }
+        diffCount++; // Add differing byte to buffer.
+        if (i < len - 1) continue;  //  <<<<<<<<<<<<<<  falls through when i == len -1.
+      } 
+      // If there was a difference and now it stops, write the buffered changes.
+      if (diffCount > 0) {
+        rv += diffCount;
+        _pageBlock(startDiffAddr, &buffer[startDiffAddr], diffCount, true, IDPage);
+        diffCount = 0; // Reset difference count after writing.
+        writeCnt++;
       }
-    }
-
-    // Check if there are any remaining differences to write after the loop.
-    if (diffCount > 0) {
-      rv += diffCount;
-      _pageBlock(startDiffAddr, writeBuf, diffCount, true, IDPage);
-      writeCnt++;
     }
     // Serial.print("EEPROM Write cycles: ");
     // Serial.println(writeCnt);
