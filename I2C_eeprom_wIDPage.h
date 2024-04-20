@@ -14,7 +14,7 @@
 #define HAS_ID_PAGE                     1
 #define ALLOW_IDPAGE_LOCK               0
 #define I_ACK_IDPAGE_CANT_BE_UNLOCKED   0
-#define PER_BYTE_COMPARE                1
+#define PER_BYTE_COMPARE                0
 
 
 #define I2C_EEPROM_VERSION          (F("1.8.3"))
@@ -178,11 +178,11 @@ private:
   //  TODO incrBuffer is an implementation name, not a functional name.
   int      _pageBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, const bool incrBuffer, bool IDPage = false);
   //  returns I2C status, 0 = OK
-  int      _WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage = false);
+  int      _WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, bool IDPage = false);
   //  returns bytes read.
-  uint16_t  _ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage = false);
+  uint16_t  _ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint16_t length, bool IDPage = false);
   //  compare bytes in EEPROM.
-  bool     _verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage = false);
+  bool     _verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, bool IDPage = false);
 
   //  to optimize the write latency of the EEPROM
   void     _waitEEReady(bool IDPage = false);

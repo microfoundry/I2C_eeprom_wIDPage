@@ -25,7 +25,7 @@
 //  I2C buffer needs max 2 bytes for EEPROM address
 //  1 byte for EEPROM register address is available in transmit buffer
 #if defined(ESP32) || defined(ESP8266) || defined(PICO_RP2040)
-#define I2C_BUFFERSIZE           252
+#define I2C_BUFFERSIZE           128
 #else
 #define I2C_BUFFERSIZE           30   //  AVR, STM
 #endif
@@ -191,7 +191,7 @@ uint16_t I2C_eeprom::readBlock(const uint16_t memoryAddress, uint8_t * buffer, c
     buffer += cnt;
     len    -= cnt;
   }
-  int et = _wire->endTransmission();
+  _wire->endTransmission();
   return rv;
 }
 
@@ -238,7 +238,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
   uint16_t rv = 0;
   
   if (_perByteCompare) {
-    Serial.println("Performing BYTE SIZE updates");
+    // Serial.println("Performing BYTE SIZE updates");
     uint16_t writeCnt = 0;
 
     // Read the original data block from the EEPROM.
@@ -260,6 +260,8 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
       } 
       // If there was a difference and now it stops, write the buffered changes.
       if (diffCount > 0) {
+        // Serial.print("Atarting Diff Address: ");
+        // Serial.println(startDiffAddr, DEC);
         rv += diffCount;
         _pageBlock(startDiffAddr, &buffer[startDiffAddr], diffCount, true, IDPage);
         diffCount = 0; // Reset difference count after writing.
@@ -273,7 +275,7 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
   } 
   else 
   {
-    Serial.println("Performing BUFFERSIZE updates");
+    // Serial.println("Performing BUFFERSIZE updates");
     while (len > 0)
     {
       uint8_t buf[I2C_BUFFERSIZE];
@@ -694,20 +696,13 @@ void I2C_eeprom::_beginTransmission(const uint16_t memoryAddress, bool IDPage)
 
 //  pre: length <= this->_pageSize  && length <= I2C_BUFFERSIZE;
 //  returns 0 = OK otherwise error
-int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage)
+int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, bool IDPage)
 {
   _waitEEReady(IDPage);
   if (_autoWriteProtect)
   {
     digitalWrite(_writeProtectPin, LOW);
   }
-
-  // for(size_t i = 0; i < length; i++) {
-    // Serial.print((char)buffer[i]); // Cast each byte to char and print
-  // }
-  // Serial.println(); // Print a newline at the end
-  // Serial.print("Length: ");
-  // Serial.println(length, DEC);
 
   this->_beginTransmission(memoryAddress, IDPage);
   _wire->write(buffer, length);
@@ -717,7 +712,7 @@ int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer
   {
     digitalWrite(_writeProtectPin, HIGH);
   }
-
+  
   _lastWrite = micros();
 
   yield();     // For OS scheduling
@@ -739,7 +734,7 @@ int I2C_eeprom::_WriteBlock(const uint16_t memoryAddress, const uint8_t * buffer
 
 //  pre: buffer is large enough to hold length bytes
 //  returns bytes read
-uint16_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint8_t length, bool IDPage)
+uint16_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, const uint16_t length, bool IDPage)
 {
   _waitEEReady(IDPage);
 
@@ -780,7 +775,7 @@ uint16_t I2C_eeprom::_ReadBlock(const uint16_t memoryAddress, uint8_t * buffer, 
 
 //  compares content of EEPROM with buffer.
 //  returns true if equal.
-bool I2C_eeprom::_verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint8_t length, bool IDPage)
+bool I2C_eeprom::_verifyBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length, bool IDPage)
 {
   _waitEEReady(IDPage);
 
