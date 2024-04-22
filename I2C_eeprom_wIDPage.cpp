@@ -780,7 +780,7 @@ bool I2C_eeprom::_verifyBlock(const uint16_t memoryAddress, const uint8_t * buff
   _waitEEReady(IDPage);
 
   this->_beginTransmission(memoryAddress, IDPage);
-  int rv = _wire->endTransmission();
+  int rv = _wire->endTransmission(false);
   if (rv != 0)
   {
 //    if (_debug)
